@@ -1,0 +1,12 @@
+.git
+.github
+.githooks
+node_modules
+data
+*.db
+*.db-*
+tests
+*.md
+.env
+.env.*
+docs
