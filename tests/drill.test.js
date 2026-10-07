@@ -156,7 +156,9 @@ test('agent: health is pending, then reports each drill; the server serves it', 
   const web = createServer(agent);
   await new Promise((r) => web.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${web.address().port}`;
-  const health = await (await fetch(`${base}/api/health`)).json();
+  const res = await fetch(`${base}/api/health`);
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  const health = await res.json();
   assert.equal(health.ok, true);
   assert.equal(health.drills[0].checks.length, 4);
   assert.equal((await fetch(`${base}/../package.json`)).status, 404);
