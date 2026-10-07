@@ -31,21 +31,25 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 // Slack and Discord each want their own shape; anything else gets the plain event.
 function webhookBody(url, m) {
   const host = (() => { try { return new URL(url).host; } catch { return ''; } })();
-  const text = `${m.ok ? 'RECOVERED' : 'FAILED'} · *${m.title}*\n${m.lines.map((l) => `• ${l}`).join('\n')}\nBackup: ${m.backup}${m.url ? `\n${m.url}` : ''}`;
+  const label = m.event === 'test' ? 'TEST' : m.ok ? 'RECOVERED' : 'FAILED';
+  const text = `${label} · *${m.title}*\n${m.lines.map((l) => `• ${l}`).join('\n')}${m.backup ? `\nBackup: ${m.backup}` : ''}${m.url ? `\n${m.url}` : ''}`;
   if (host === 'hooks.slack.com') return { text, blocks: [{ type: 'section', text: { type: 'mrkdwn', text } }] };
   if (/(^|\.)discord(app)?\.com$/.test(host)) return { content: text.replace(/\*/g, '**') };
   return { event: m.event, drill: m.drill, ok: m.ok, at: m.at, title: m.title, reasons: m.lines, backup: m.backup, url: m.url };
 }
 
+// "7 Oct 2026, 07:37 UTC": readable in any inbox, unambiguous across time zones.
+const when = (iso) => new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+
 function emailHtml(m) {
-  const ink = m.ok ? '#2f7a3e' : '#b42a20';
+  const ink = m.event === 'test' ? '#16171a' : m.ok ? '#2f7a3e' : '#b42a20';
   return `<!doctype html><html><body style="margin:0;background:#f2f3f1;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#16171a">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fbfbfa;border:1px solid #d9dad6;border-radius:6px">
 <tr><td style="padding:28px 32px 8px;font:600 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase;color:${ink}">Restore Drill · ${esc(m.event)}</td></tr>
 <tr><td style="padding:6px 32px 14px;font-size:22px;font-weight:700;letter-spacing:-.02em">${esc(m.title)}</td></tr>
 <tr><td style="padding:0 32px 18px;font-size:14px;line-height:1.6">${m.lines.map((l) => `<div style="padding:6px 0;border-top:1px solid #e6e7e3">${esc(l)}</div>`).join('')}</td></tr>
-<tr><td style="padding:0 32px 26px;font:12px/1.5 ui-monospace,Menlo,monospace;color:#5d5f63">Backup: ${esc(m.backup)}<br>Drilled: ${esc(m.at)}</td></tr>
+<tr><td style="padding:0 32px 26px;font:12px/1.5 ui-monospace,Menlo,monospace;color:#5d5f63">${m.backup ? `Backup: ${esc(m.backup)}<br>` : ''}${m.event === 'test' ? 'Sent' : 'Drilled'}: ${esc(when(m.at))}</td></tr>
 ${m.url ? `<tr><td style="padding:0 32px 30px"><a href="${esc(m.url)}" style="display:inline-block;background:#16171a;color:#fbfbfa;text-decoration:none;padding:10px 16px;border-radius:4px;font-size:14px;font-weight:600">Open the evidence page</a></td></tr>` : ''}
 </table></td></tr></table></body></html>`;
 }
@@ -78,7 +82,7 @@ function createAlerter({ config = {}, env = process.env, fetchImpl = fetch, log 
     }
     if (emailTo && mailer) {
       try {
-        await mailer.sendMail({ from, to: emailTo, subject: `Restore Drill: ${m.title}`, text: `${m.title}\n\n${m.lines.join('\n')}\n\nBackup: ${m.backup}\n${m.url || ''}`, html: emailHtml(m) });
+        await mailer.sendMail({ from, to: emailTo, subject: `Restore Drill: ${m.title}`, text: `${m.title}\n\n${m.lines.join('\n')}${m.backup ? `\n\nBackup: ${m.backup}` : ''}\n${m.url || ''}`, html: emailHtml(m) });
         sent.push('email');
       } catch (err) { log.error(`[alert] email failed: ${err.message}`); }
     }
@@ -95,9 +99,9 @@ function createAlerter({ config = {}, env = process.env, fetchImpl = fetch, log 
     return sent.length ? { ok: r.ok, alertedAt: now } : prev || null;
   }
 
+  // A test is labelled as one: no "failed", no fake backup line.
   async function test() {
-    const r = { name: 'Restore Drill test', ok: false, at: new Date().toISOString(), checks: [{ name: 'this is a test alert', ok: false, detail: 'no backup is broken' }], backup: null };
-    return send({ ...message('failed', r, config.url), title: 'Test alert: delivery works' });
+    return send({ event: 'test', title: 'Test alert: delivery works', lines: ['This channel will receive a message when a drill starts failing, when it recovers, and daily while it stays broken.'], backup: '', url: config.url, drill: 'test', ok: true, at: new Date().toISOString() });
   }
 
   return { onResult, test, channels };

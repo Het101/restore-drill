@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/banner.jpg" alt="Restore Drill: proof that your backups actually restore" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.jpg" />
+    <img src="docs/banner.jpg" alt="Restore Drill: proof that your backups actually restore" />
+  </picture>
 </p>
 
 <h1 align="center">Restore Drill</h1>
@@ -20,7 +23,10 @@
 A backup that has never been restored is a hope, not a backup. Most teams find out their backups are empty, corrupt or weeks old on the day they need them. Restore Drill finds out every few hours instead.
 
 <p align="center">
-  <img src="docs/evidence-page.png" alt="The Restore Drill evidence page: a stamped verdict, the anatomy of the last drill, a ledger of every backup with its 30-run history, and a log of recent drills" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/evidence-page-dark.png" />
+    <img src="docs/evidence-page.png" alt="The live Restore Drill evidence page: a stamped verdict, the anatomy of the last drill, a ledger of every backup with its 30-run history, and a log of recent drills" />
+  </picture>
 </p>
 
 ## What every drill does
