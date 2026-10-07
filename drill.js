@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const zlib = require('zlib');
 const Database = require('better-sqlite3');
+const { restorePostgres } = require('./pg');
 
 const UNITS = { s: 1e3, m: 6e4, h: 36e5, d: 864e5 };
 function duration(text) {
@@ -20,35 +21,86 @@ function human(ms) {
   return `${(ms / 864e5).toFixed(1).replace(/\.0$/, '')} d`;
 }
 
-const quote = (name) => `"${String(name).replace(/"/g, '""')}"`;
-const hasTable = (db, t) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name = ?").get(t);
-// Timestamps may be stored in seconds or milliseconds; anything after 2001 in ms is > 1e12.
-const toMs = (v) => (typeof v === 'string' ? Date.parse(v) : v > 1e12 ? v : v * 1000);
+// Identifiers: "name", or "schema"."name" when the config says schema.name.
+const quote = (name) => String(name).split('.').map((p) => `"${p.replace(/"/g, '""')}"`).join('.');
+// Timestamps may be epoch seconds or milliseconds (anything after 2001 in ms is > 1e12), ISO text,
+// or Postgres text output ("2026-10-07 05:00:00.123+00"); a timestamp without a zone is read as UTC.
+function toMs(v) {
+  if (typeof v === 'number') return v > 1e12 ? v : v * 1000;
+  const s = String(v).trim();
+  if (/^\d+(\.\d+)?$/.test(s)) return toMs(Number(s));
+  // Postgres prints zones as +00 or +0530; Date.parse wants +00:00.
+  const iso = s.replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00').replace(/([+-]\d\d)(\d\d)$/, '$1:$2');
+  return Date.parse(/(Z|[+-]\d\d:\d\d)$/.test(iso) ? iso : `${iso}Z`);
+}
+
+// Each engine answers the same four questions, so every check works on both.
+function sqliteEngine(db) {
+  const one = (sql, ...args) => db.prepare(sql).raw().get(...args);
+  return {
+    hasTable: async (t) => !!one("SELECT 1 FROM sqlite_master WHERE type IN ('table','view') AND name = ?", t),
+    count: async (t) => one(`SELECT COUNT(*) FROM ${quote(t)}`)[0],
+    newest: async (t, col) => one(`SELECT MAX(${quote(col)}) FROM ${quote(t)}`)[0],
+    query: async (sql) => { const row = one(sql); return row ? row[0] : null; },
+  };
+}
+function postgresEngine(pg) {
+  const lit = (s) => `'${String(s).replace(/'/g, "''")}'`;
+  return {
+    hasTable: async (t) => (await pg.query(`SELECT to_regclass(${lit(quote(t))}) IS NOT NULL`)) === 't',
+    count: async (t) => Number(await pg.query(`SELECT COUNT(*) FROM ${quote(t)}`)),
+    newest: async (t, col) => { const v = await pg.query(`SELECT MAX(${quote(col)})::text FROM ${quote(t)}`); return v === '' ? null : v; },
+    query: async (sql) => { const out = await pg.query(sql); return out === '' ? null : out.split('\n')[0].split('|')[0]; },
+  };
+}
 
 // Each check returns { name, ok, detail }. Details can hold row counts, so they stay out of public output.
-function runCheck(db, c, now) {
+async function runCheck(db, c, now) {
   if (c.query) {
-    const row = db.prepare(c.query).raw().get();
-    const got = row ? String(row[0]) : '(no rows)';
+    const v = await db.query(c.query);
+    const got = v === null || v === undefined ? '(no rows)' : String(v);
     return { name: c.name || `query = ${c.expect}`, ok: got === String(c.expect), detail: `returned ${got}` };
   }
   if (!c.table) throw new Error('a check needs "table" or "query"');
-  if (!hasTable(db, c.table)) return { name: `${c.table} exists`, ok: false, detail: 'table missing' };
+  if (!(await db.hasTable(c.table))) return { name: `${c.table} exists`, ok: false, detail: 'table missing' };
   if (c.newest) {
-    const v = db.prepare(`SELECT MAX(${quote(c.newest)}) FROM ${quote(c.table)}`).raw().get()[0];
+    const v = await db.newest(c.table, c.newest);
     if (v === null || v === undefined) return { name: `${c.table} has recent rows`, ok: false, detail: 'no rows' };
     const age = now - toMs(v);
     return { name: `${c.table} newest row within ${c.max_age}`, ok: age <= duration(c.max_age), detail: `newest row ${human(Math.max(0, age))} old` };
   }
-  const n = db.prepare(`SELECT COUNT(*) FROM ${quote(c.table)}`).raw().get()[0];
+  const n = await db.count(c.table);
   const min = c.min_rows ?? 1;
   const name = min === 0 ? `${c.table} table is present` : `${c.table} has at least ${min} row${min === 1 ? '' : 's'}`;
   return { name, ok: n >= min, detail: `${n} rows` };
 }
 
+async function restoreAndCheck(drill, file, dir, now, r) {
+  if (drill.engine === 'postgres') {
+    const pg = await restorePostgres(file, dir); // throws if the dump does not restore
+    try {
+      r.checks.push({ name: 'restores cleanly into a fresh PostgreSQL', ok: true, detail: 'pg_restore exited 0' });
+      const db = postgresEngine(pg);
+      for (const c of drill.checks || []) r.checks.push(await runCheck(db, c, now));
+    } finally {
+      await pg.stop();
+    }
+    return;
+  }
+  const db = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    const integrity = db.pragma('integrity_check', { simple: true });
+    r.checks.push({ name: 'opens and passes integrity_check', ok: integrity === 'ok', detail: integrity });
+    const engine = sqliteEngine(db);
+    for (const c of drill.checks || []) r.checks.push(await runCheck(engine, c, now));
+  } finally {
+    db.close();
+  }
+}
+
 async function runDrill(drill, store, { now = Date.now(), tmp = os.tmpdir() } = {}) {
   const started = Date.now();
-  const r = { name: drill.name, ok: false, at: new Date(now).toISOString(), checks: [] };
+  const r = { name: drill.name, engine: drill.engine || 'sqlite', ok: false, at: new Date(now).toISOString(), checks: [] };
   try {
     const match = drill.match ? new RegExp(drill.match) : null;
     const objects = (await store.list(drill.prefix)).filter((o) => o.size > 0 && (!match || match.test(o.key)));
@@ -66,23 +118,16 @@ async function runDrill(drill, store, { now = Date.now(), tmp = os.tmpdir() } = 
     // The disposable restore target: a private temp directory, removed whatever happens.
     const dir = fs.mkdtempSync(path.join(tmp, 'restore-drill-'));
     try {
-      const file = path.join(dir, 'restored.db');
+      const file = path.join(dir, 'backup');
       fs.writeFileSync(file, body);
       t = Date.now();
-      const db = new Database(file, { readonly: true, fileMustExist: true });
-      try {
-        const integrity = db.pragma('integrity_check', { simple: true });
-        r.checks.push({ name: 'opens and passes integrity_check', ok: integrity === 'ok', detail: integrity });
-        for (const c of drill.checks || []) r.checks.push(runCheck(db, c, now));
-      } finally {
-        db.close();
-      }
+      await restoreAndCheck({ ...drill, engine: r.engine }, file, dir, now, r);
       r.restoreMs = Date.now() - t;
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   } catch (err) {
-    // "file is not a database" and friends land here: the restore itself failed.
+    // "file is not a database", a pg_restore error and friends land here: the restore itself failed.
     r.error = err.message;
   }
   r.ok = !r.error && r.checks.length > 0 && r.checks.every((c) => c.ok);
@@ -93,11 +138,11 @@ async function runDrill(drill, store, { now = Date.now(), tmp = os.tmpdir() } = 
 // What anyone may see: pass/fail, timings, backup age. No row counts, no query results.
 function publicView(r) {
   return {
-    name: r.name, ok: r.ok, at: r.at, ms: r.ms, restoreMs: r.restoreMs ?? null,
+    name: r.name, engine: r.engine || 'sqlite', ok: r.ok, at: r.at, ms: r.ms, restoreMs: r.restoreMs ?? null,
     backup: r.backup ? { at: r.backup.at, age: r.backup.age, bytes: r.backup.bytes } : null,
     checks: r.checks.map((c) => ({ name: c.name, ok: c.ok })),
     error: r.error ? r.error.replace(/https?:\/\/\S+/g, '<storage>') : undefined,
   };
 }
 
-module.exports = { runDrill, publicView, duration, human };
+module.exports = { runDrill, publicView, duration, human, toMs };

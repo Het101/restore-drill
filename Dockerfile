@@ -6,9 +6,12 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 FROM node:22-alpine
+# PostgreSQL 17 server + client: Postgres drills restore into a throwaway server inside this
+# container (17 restores dumps from older servers too). SQLite drills don't need it.
+RUN apk add --no-cache postgresql17 postgresql17-client
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json server.js drill.js config.js s3.js cli.js drills.yml ./
+COPY package.json server.js drill.js config.js s3.js pg.js cli.js drills.yml ./
 COPY public ./public
 RUN mkdir -p /app/data && chown node:node /app/data
 USER node

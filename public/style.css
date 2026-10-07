@@ -61,6 +61,8 @@ code { font: 500 0.85em var(--mono); color: var(--text); }
 .drill.is-pending { --tone-rgb: 138, 133, 125; }
 .drill-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .drill-head h2 { margin: 0; font: 700 1.15rem/1.2 var(--sans); letter-spacing: -0.02em; color: var(--text); }
+.drill-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.engine { font: 500 0.66rem var(--mono); color: var(--muted); letter-spacing: 0.04em; }
 .chip { font: 600 0.72rem var(--mono); padding: 5px 10px; border-radius: 999px; color: rgb(var(--tone-rgb)); background: rgba(var(--tone-rgb), 0.12); border: 1px solid rgba(var(--tone-rgb), 0.35); }
 .note { margin: 0; color: var(--muted); }
 
