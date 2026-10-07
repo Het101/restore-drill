@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>Scheduled proof that your backups actually restore.</b><br />
-  Pulls the newest backup from S3-compatible storage, restores it into a throwaway copy, checks it, and throws it away.
+  Pulls the newest SQLite or PostgreSQL backup from S3-compatible storage, restores it into a throwaway copy, checks it, and throws it away.
 </p>
 
 <p align="center">
@@ -26,8 +26,8 @@ A backup that has never been restored is a hope, not a backup. Most teams find o
 ## What every drill does
 
 1. **Find** the newest backup under a prefix in your bucket, and fail if it is older than the limit (a backup job that silently stopped is the most common failure).
-2. **Restore** it into a private temporary directory, never near the live database.
-3. **Prove** it: SQLite `integrity_check`, the tables you expect, minimum row counts, how fresh the newest row is, or any query you write.
+2. **Restore** it somewhere disposable, never near the live database: a private temporary directory for SQLite, a throwaway PostgreSQL server started inside the container for Postgres dumps.
+3. **Prove** it: SQLite `integrity_check` or a clean `pg_restore`, the tables you expect, minimum row counts, how fresh the newest row is, or any query you write.
 4. **Destroy** the copy, and record the result and how long the restore took.
 
 Data never leaves your infrastructure: the agent runs next to your storage and only reads from it.
@@ -73,17 +73,28 @@ drills:
         max_age: 2d
       - query: SELECT COUNT(*) FROM users WHERE email IS NULL
         expect: 0
+
+  - name: Analytics
+    engine: postgres # pg_dump custom format (.dump/.dmp) or plain SQL, optionally .gz
+    prefix: postgres/analytics/
+    checks:
+      - table: website_event # schema.table works too
+        newest: created_at
+        max_age: 2d
 ```
 
 | Check | Passes when |
 | --- | --- |
 | *(always)* `newest backup within max_age` | the newest backup is recent enough |
-| *(always)* `opens and passes integrity_check` | the file is a SQLite database and `PRAGMA integrity_check` says `ok` |
+| *(always, SQLite)* `opens and passes integrity_check` | the file is a SQLite database and `PRAGMA integrity_check` says `ok` |
+| *(always, Postgres)* `restores cleanly into a fresh PostgreSQL` | `pg_restore --exit-on-error` (or `psql -v ON_ERROR_STOP=1` for plain SQL) finishes without an error |
 | `table` + `min_rows` | the table exists with at least that many rows (`min_rows: 0` = it exists) |
 | `table` + `newest` + `max_age` | the newest value in that column is recent enough |
 | `query` + `expect` | the first column of the first row equals `expect` |
 
 Gzipped backups (`.gz`) are decompressed before the restore.
+
+**How the Postgres restore works.** The agent runs `initdb` in a private temporary directory and starts a PostgreSQL 17 server that listens on a Unix socket only (no TCP port), restores the dump with ownership and grants stripped (the source server's roles don't exist here), runs the checks through `psql`, then stops the server and deletes the directory. It needs no Docker socket and never connects to your live database. PostgreSQL 17 restores dumps from older servers too.
 
 ## Run it as a service
 
@@ -116,7 +127,7 @@ Give the agent a key that can only read the backup bucket. On Cloudflare R2: *R2
 
 ## Roadmap
 
-- PostgreSQL: `pg_restore` into a disposable Postgres container, the same checks in SQL
+- ~~PostgreSQL~~: shipped in 0.2.0
 - MySQL / MariaDB
 - Email and webhook alerts without a separate monitor
 - A monthly evidence report (PDF) for SOC 2 and ISO 27001 audits: every drill, its result and restore time
@@ -125,7 +136,8 @@ Give the agent a key that can only read the backup bucket. On Cloudflare R2: *R2
 
 ```bash
 npm ci
-npm test      # fake S3 bucket, real SQLite files: good, corrupt, stale and incomplete backups
+npm test      # fake S3 bucket, real SQLite files and real pg_dump output: good, corrupt, stale, incomplete
+              # (Postgres tests need initdb/pg_restore on PATH and Linux or macOS; they skip elsewhere)
 npm run lint
 npm run hooks # conventional, signed commits
 ```

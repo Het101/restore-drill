@@ -32,7 +32,10 @@ function card(d, runs) {
   const state = d.pending ? 'pending' : d.ok ? 'ok' : 'bad';
   const c = el('article', `drill is-${state}`);
   const head = el('header', 'drill-head');
-  head.append(el('h2', '', d.name), el('span', 'chip', d.pending ? 'Waiting' : d.ok ? 'Restores' : 'Failed'));
+  const title = el('div', 'drill-title');
+  title.append(el('h2', '', d.name));
+  if (d.engine) title.append(el('span', 'engine', d.engine === 'postgres' ? 'PostgreSQL' : 'SQLite'));
+  head.append(title, el('span', 'chip', d.pending ? 'Waiting' : d.ok ? 'Restores' : 'Failed'));
   c.append(head);
   if (d.pending) { c.append(el('p', 'note', 'First drill runs a few seconds after start.')); return c; }
 

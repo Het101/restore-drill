@@ -35,3 +35,17 @@ drills:
         min_rows: 0
       - table: scans
         min_rows: 0
+
+  # Umami (PostgreSQL), once Coolify's scheduled backup writes to this bucket.
+  # Set the prefix to the folder Coolify uses (shown on the backup in Coolify / in R2).
+  # - name: Analytics (Umami)
+  #   engine: postgres
+  #   prefix: ${UMAMI_BACKUP_PREFIX}
+  #   match: '\.(dmp|dump|sql)(\.gz)?$'
+  #   max_age: 26h
+  #   checks:
+  #     - table: website
+  #       min_rows: 1
+  #     - table: website_event
+  #       newest: created_at
+  #       max_age: 2d

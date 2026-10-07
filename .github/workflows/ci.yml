@@ -231,6 +231,8 @@ jobs:
           # one), and the data volume must be writable by the non-root user (results.json).
           docker exec app node -e "new (require('better-sqlite3'))(':memory:').pragma('integrity_check')"
           docker exec app sh -c 'touch /app/data/.write-test && rm /app/data/.write-test'
+          # Postgres drills start a throwaway server in the container: the binaries must be there.
+          docker exec app sh -c 'initdb --version && pg_restore --version && psql --version'
           [ "$(docker exec app id -u)" != "0" ] || { echo "::error::the container runs as root"; exit 1; }
           if docker exec app sh -c 'command -v g++' > /dev/null; then
             echo "::error::the runtime image still ships a compiler"; exit 1

@@ -1,6 +1,6 @@
 {
   "name": "restore-drill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Scheduled proof that backups actually restore: pulls the newest backup from S3-compatible storage, restores it into a throwaway copy, runs checks, and reports.",
   "main": "drill.js",
   "bin": {
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server.js",
     "drill": "node cli.js",
-    "lint": "node --check s3.js && node --check drill.js && node --check config.js && node --check server.js && node --check cli.js && node --check public/app.js",
+    "lint": "node --check s3.js && node --check drill.js && node --check config.js && node --check pg.js && node --check server.js && node --check cli.js && node --check public/app.js",
     "test": "node --test tests/*.test.js",
     "hooks": "git config core.hooksPath .githooks"
   },
@@ -23,8 +23,8 @@
   "homepage": "https://drill.hetops.dev",
   "license": "MIT",
   "author": "Het Patel (https://hetops.dev)",
-  "keywords": ["backup", "restore", "disaster-recovery", "sqlite", "s3", "r2", "devops", "soc2"],
-  "files": ["cli.js", "drill.js", "config.js", "s3.js", "server.js", "public", "drills.yml"],
+  "keywords": ["backup", "restore", "disaster-recovery", "sqlite", "postgresql", "s3", "r2", "devops", "soc2"],
+  "files": ["cli.js", "drill.js", "config.js", "s3.js", "pg.js", "server.js", "public", "drills.yml"],
   "dependencies": {
     "better-sqlite3": "^12.11.1",
     "yaml": "^2.8.1"

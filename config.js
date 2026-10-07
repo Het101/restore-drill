@@ -31,7 +31,7 @@ function loadConfig(file, env = process.env) {
   const drills = cfg.drills.map((d, i) => {
     if (!d.name || !d.prefix) throw new Error(`${file}: drills[${i}] needs name and prefix`);
     const engine = d.engine || 'sqlite';
-    if (engine !== 'sqlite') throw new Error(`${file}: drills[${i}] engine "${engine}" is not supported yet (sqlite only)`);
+    if (!['sqlite', 'postgres'].includes(engine)) throw new Error(`${file}: drills[${i}] engine "${engine}" is not supported (sqlite or postgres)`);
     const out = { ...d, engine, max_age: d.max_age || '26h' };
     duration(out.max_age);
     for (const c of d.checks || []) if (c.max_age) duration(c.max_age);
