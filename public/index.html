@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Restore Drill · HetOps</title>
+    <meta name="description" content="Proof that the HetOps backups restore: every few hours the newest backup is restored into a disposable copy and checked." />
+    <meta name="theme-color" content="#0b0b0d" />
+    <link rel="icon" href="/icon.webp" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="top">
+        <a class="brand" href="https://hetops.dev">
+          <img src="/icon.webp" width="36" height="36" alt="" />
+          <span>Restore Drill <small>by HetOps</small></span>
+        </a>
+        <a class="gh" href="https://github.com/Het101/restore-drill">Open source on GitHub</a>
+      </header>
+
+      <section class="hero" id="hero" data-state="pending">
+        <p class="eyebrow" id="eyebrow">Checking</p>
+        <h1 id="verdict">Waiting for the first drill</h1>
+        <p class="lede">
+          Every few hours the newest backup is downloaded from offsite storage, restored into a throwaway copy,
+          checked, and deleted. A backup only counts once it has been restored.
+        </p>
+        <p class="meta" id="meta"></p>
+      </section>
+
+      <section class="drills" id="drills" aria-live="polite"></section>
+
+      <section class="how">
+        <h2>What every drill does</h2>
+        <ol>
+          <li><b>Find</b> the newest backup in the bucket and fail if it is older than the limit.</li>
+          <li><b>Restore</b> it into a private temporary directory, away from the live database.</li>
+          <li><b>Prove</b> it: SQLite <code>integrity_check</code>, the expected tables, row and freshness checks.</li>
+          <li><b>Destroy</b> the copy and record the result and the restore time.</li>
+        </ol>
+      </section>
+
+      <footer class="foot">
+        <span>Part of <a href="https://hetops.dev">HetOps</a> · uptime at <a href="https://status.hetops.dev">status.hetops.dev</a></span>
+        <span id="version"></span>
+      </footer>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

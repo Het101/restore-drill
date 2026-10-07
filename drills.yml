@@ -1,0 +1,37 @@
+# HetOps dogfood: the nightly SQLite backups of DNS Intelligence and Radar Cloud in Cloudflare R2.
+# Copy this file and change the prefixes and checks to drill your own backups.
+storage:
+  endpoint: ${S3_ENDPOINT}
+  bucket: ${S3_BUCKET:-hetops-backups}
+  region: auto
+  # Use a read-only key: the drill never writes to the bucket.
+  access_key_id: ${S3_ACCESS_KEY_ID}
+  secret_access_key: ${S3_SECRET_ACCESS_KEY}
+
+# How often every drill runs. Each run downloads the newest backup once.
+every: 6h
+
+drills:
+  - name: DNS Intelligence
+    prefix: hetops-dns/
+    match: '\.db$'
+    max_age: 26h # backups are nightly; older than this means the backup job stopped
+    checks:
+      - table: users
+        min_rows: 1
+      - table: watches
+        min_rows: 0
+      - table: history
+        min_rows: 0
+
+  - name: Radar Cloud
+    prefix: radar-cloud/
+    match: '\.db$'
+    max_age: 26h
+    checks:
+      - table: users
+        min_rows: 1
+      - table: accounts
+        min_rows: 0
+      - table: scans
+        min_rows: 0
