@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.jpg" />
-    <img src="docs/banner.jpg" alt="Restore Drill: proof that your backups actually restore" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/Het101/restore-drill@main/docs/banner-dark.jpg" />
+    <img src="https://cdn.jsdelivr.net/gh/Het101/restore-drill@main/docs/banner.jpg" alt="Restore Drill: proof that your backups actually restore" />
   </picture>
 </p>
 
@@ -24,8 +24,8 @@ A backup that has never been restored is a hope, not a backup. Most teams find o
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/evidence-page-dark.png" />
-    <img src="docs/evidence-page.png" alt="The live Restore Drill evidence page: a stamped verdict, the anatomy of the last drill, a ledger of every backup with its 30-run history, and a log of recent drills" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://cdn.jsdelivr.net/gh/Het101/restore-drill@main/docs/evidence-page-dark.png" />
+    <img src="https://cdn.jsdelivr.net/gh/Het101/restore-drill@main/docs/evidence-page.png" alt="The live Restore Drill evidence page: a stamped verdict, the anatomy of the last drill, a ledger of every backup with its 30-run history, and a log of recent drills" />
   </picture>
 </p>
 
@@ -48,7 +48,7 @@ node --env-file=.env cli.js --config drills.yml
 ```
 
 <p align="center">
-  <img src="docs/cli.png" width="760" alt="restore-drill CLI output: two backups restored and verified, with each check listed" />
+  <img src="https://cdn.jsdelivr.net/gh/Het101/restore-drill@main/docs/cli.png" width="760" alt="restore-drill CLI output: two backups restored and verified, with each check listed" />
 </p>
 
 It exits `1` when any drill fails, so it also works from cron or a CI job. `--json` prints the full results.
@@ -140,7 +140,7 @@ node --env-file=.env cli.js --test-alert
 You can also point an uptime monitor at `/api/health`. In Uptime Kuma: *HTTP(s) - Json Query*, query `ok`, expected value `true`.
 
 <p align="center">
-  <img src="docs/evidence-page-failed.png" width="760" alt="The evidence page when a restore fails: the stamp turns red, the failing backup opens with its reason" />
+  <img src="https://cdn.jsdelivr.net/gh/Het101/restore-drill@main/docs/evidence-page-failed.png" width="760" alt="The evidence page when a restore fails: the stamp turns red, the failing backup opens with its reason" />
 </p>
 
 **What is public.** The page and `/api/health` show pass/fail, check names, restore times and backup age. Row counts, query results and storage URLs stay in the agent's logs.
