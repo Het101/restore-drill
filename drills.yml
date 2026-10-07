@@ -36,16 +36,19 @@ drills:
       - table: scans
         min_rows: 0
 
-  # Umami (PostgreSQL), once Coolify's scheduled backup writes to this bucket.
-  # Set the prefix to the folder Coolify uses (shown on the backup in Coolify / in R2).
-  # - name: Analytics (Umami)
-  #   engine: postgres
-  #   prefix: ${UMAMI_BACKUP_PREFIX}
-  #   match: '\.(dmp|dump|sql)(\.gz)?$'
-  #   max_age: 26h
-  #   checks:
-  #     - table: website
-  #       min_rows: 1
-  #     - table: website_event
-  #       newest: created_at
-  #       max_age: 2d
+  # Umami's Postgres, dumped daily at 03:00 UTC by Coolify's scheduled backup (pg_dump custom format).
+  - name: Analytics (Umami)
+    engine: postgres
+    prefix: data/coolify/backups/databases/root-team-0/umami-nu2pxyzpli2k1u0fmpvwmhdr-postgresql-nu2pxyzpli2k1u0fmpvwmhdr/
+    match: '\.dmp$'
+    max_age: 26h
+    checks:
+      - table: _prisma_migrations # the schema migrated fully
+        min_rows: 1
+      - table: website # the tracked sites
+        min_rows: 1
+      - table: website_event
+        min_rows: 1
+      - table: website_event # analytics kept flowing up to the dump
+        newest: created_at
+        max_age: 7d
