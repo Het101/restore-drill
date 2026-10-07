@@ -65,8 +65,9 @@ function createServer(agent, publicDir = path.join(__dirname, 'public')) {
   const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg' };
   return http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
+    // The API is public and read-only, so other pages (hetops.dev shows it live) may read it.
     const send = (code, body, type = 'application/json') => {
-      res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'" });
+      res.writeHead(code, { ...(url.pathname.startsWith('/api/') ? { 'access-control-allow-origin': '*' } : {}), 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'" });
       res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
     };
     if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, { error: 'method not allowed' });
