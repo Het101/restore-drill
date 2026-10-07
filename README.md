@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/icon.webp" width="88" height="88" alt="Restore Drill icon" />
+  <img src="docs/banner.jpg" alt="Restore Drill: proof that your backups actually restore" />
 </p>
 
 <h1 align="center">Restore Drill</h1>
