@@ -37,7 +37,10 @@ function loadConfig(file, env = process.env) {
     for (const c of d.checks || []) if (c.max_age) duration(c.max_age);
     return out;
   });
+  const a = cfg.alerts || {};
+  if (a.remind) duration(a.remind);
   return {
+    alerts: { webhook: a.webhook || '', email_to: a.email_to || '', remind: a.remind || '24h', url: a.url || '' },
     storage: { endpoint: s.endpoint, bucket: s.bucket, region: s.region || 'auto', accessKeyId: s.access_key_id, secretAccessKey: s.secret_access_key },
     every: duration(cfg.every || '6h'),
     drills,

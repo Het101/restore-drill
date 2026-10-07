@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// restore-drill [--config drills.yml] [--json]
+// restore-drill [--config drills.yml] [--json] [--test-alert]
 // Runs every drill once and exits 1 if any fails, so it also works from cron or CI.
 const path = require('path');
 const { loadConfig } = require('./config');
 const { createStore } = require('./s3');
 const { runDrill } = require('./drill');
+const { createAlerter } = require('./alerts');
 
 const args = process.argv.slice(2);
 const flag = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
@@ -15,6 +16,13 @@ const pass = paint(32, '✓'), fail = paint(31, '✗');
 
 (async () => {
   const config = loadConfig(path.resolve(flag('--config') || 'drills.yml'));
+  if (args.includes('--test-alert')) {
+    const alerter = createAlerter({ config: config.alerts });
+    if (!alerter.channels.length) throw new Error('no alert channel configured: set ALERT_WEBHOOK_URL, or ALERT_EMAIL_TO with SMTP_HOST');
+    const sent = await alerter.test();
+    console.log(sent.length ? `${pass} test alert sent via ${sent.join(' + ')}` : `${fail} test alert not delivered (see the errors above)`);
+    process.exit(sent.length ? 0 : 1);
+  }
   const store = createStore(config.storage);
   const results = [];
   for (const drill of config.drills) {
