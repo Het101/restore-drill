@@ -19,7 +19,7 @@ drills:
     checks:
       - table: users
         min_rows: 1
-      - table: watches
+      - table: alerts # Domain Watch watches
         min_rows: 0
       - table: history
         min_rows: 0
