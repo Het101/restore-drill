@@ -11,6 +11,14 @@ storage:
 # How often every drill runs. Each run downloads the newest backup once.
 every: 6h
 
+# Alerts when a drill starts failing, when it recovers, and every `remind` while it stays broken.
+# Email needs SMTP_HOST (+ SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, MAIL_FROM) in the environment.
+alerts:
+  webhook: ${ALERT_WEBHOOK_URL:-} # Slack or Discord incoming webhook, or any URL that takes JSON
+  email_to: ${ALERT_EMAIL_TO:-}
+  remind: 24h
+  url: https://drill.hetops.dev
+
 drills:
   - name: DNS Intelligence
     prefix: hetops-dns/

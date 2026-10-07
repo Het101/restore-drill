@@ -20,7 +20,7 @@
 A backup that has never been restored is a hope, not a backup. Most teams find out their backups are empty, corrupt or weeks old on the day they need them. Restore Drill finds out every few hours instead.
 
 <p align="center">
-  <img src="docs/evidence-page.png" alt="The Restore Drill evidence page: both backups restore, with per-drill checks, a 10-day pass history and restore times" />
+  <img src="docs/evidence-page.png" alt="The Restore Drill evidence page: a stamped verdict, the anatomy of the last drill, a ledger of every backup with its 30-run history, and a log of recent drills" />
 </p>
 
 ## What every drill does
@@ -113,7 +113,29 @@ docker run -d -p 3000:3000 --env-file .env -v drill-data:/app/data restore-drill
 
 The image runs as a non-root user, ships no compiler, and keeps its history in `/app/data`. Mount your own config with `-v ./drills.yml:/app/drills.yml`.
 
-**Alerting.** Point any uptime monitor at `/api/health`. In Uptime Kuma: monitor type *HTTP(s) - Json Query*, JSON query `ok`, expected value `true`. The drill then pages you the same way as everything else.
+### Alerts
+
+The agent tells you when a drill **starts failing**, when it **recovers**, and every `remind` (24 h by default) while it stays broken. Nothing on a steady pass, so a 6-hour schedule never turns into noise. The last state is kept in `/app/data`, so a redeploy doesn't re-alert.
+
+```yaml
+alerts:
+  webhook: ${ALERT_WEBHOOK_URL:-} # Slack or Discord incoming webhook, or any URL that takes JSON
+  email_to: ${ALERT_EMAIL_TO:-} # needs SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SECURE, MAIL_FROM
+  remind: 24h
+  url: https://drill.example.com # linked from every alert
+```
+
+Slack and Discord get a formatted message; any other URL gets `{event, drill, ok, at, title, reasons, backup, url}`. Check the wiring before you need it:
+
+```bash
+node --env-file=.env cli.js --test-alert
+```
+
+You can also point an uptime monitor at `/api/health`. In Uptime Kuma: *HTTP(s) - Json Query*, query `ok`, expected value `true`.
+
+<p align="center">
+  <img src="docs/evidence-page-failed.png" width="760" alt="The evidence page when a restore fails: the stamp turns red, the failing backup opens with its reason" />
+</p>
 
 **What is public.** The page and `/api/health` show pass/fail, check names, restore times and backup age. Row counts, query results and storage URLs stay in the agent's logs.
 
@@ -123,13 +145,13 @@ Give the agent a key that can only read the backup bucket. On Cloudflare R2: *R2
 
 ## Dogfooded on HetOps
 
-[drill.hetops.dev](https://drill.hetops.dev) drills the nightly backups of [DNS Intelligence](https://dns.hetops.dev) and [Radar Cloud](https://radar.hetops.dev) from Cloudflare R2 with the `drills.yml` in this repo, and [status.hetops.dev](https://status.hetops.dev) alerts if a drill fails.
+[drill.hetops.dev](https://drill.hetops.dev) drills the nightly backups of [DNS Intelligence](https://dns.hetops.dev) and [Radar Cloud](https://radar.hetops.dev) (SQLite) and the HetOps analytics database (Umami on PostgreSQL) from Cloudflare R2 with the `drills.yml` in this repo, and [status.hetops.dev](https://status.hetops.dev) shows the result.
 
 ## Roadmap
 
 - ~~PostgreSQL~~: shipped in 0.2.0
 - MySQL / MariaDB
-- Email and webhook alerts without a separate monitor
+- ~~Email and webhook alerts~~: shipped in 0.3.0
 - A monthly evidence report (PDF) for SOC 2 and ISO 27001 audits: every drill, its result and restore time
 
 ## Development

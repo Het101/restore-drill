@@ -12,7 +12,7 @@ FROM node:22-alpine
 RUN apk add --no-cache postgresql17 postgresql17-client postgresql17-contrib
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json server.js drill.js config.js s3.js pg.js cli.js drills.yml ./
+COPY package.json server.js drill.js config.js s3.js pg.js alerts.js cli.js drills.yml ./
 COPY public ./public
 RUN mkdir -p /app/data && chown node:node /app/data
 USER node

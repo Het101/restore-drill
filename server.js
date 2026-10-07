@@ -8,14 +8,18 @@ const path = require('path');
 const { loadConfig } = require('./config');
 const { createStore } = require('./s3');
 const { runDrill, publicView } = require('./drill');
+const { createAlerter } = require('./alerts');
 const { version } = require('./package.json');
 
 const KEEP = 120; // runs per drill: 30 days at the default 6 h interval
 
-function createAgent({ config, store, dataDir, log = console }) {
+function createAgent({ config, store, dataDir, log = console, alerter = createAlerter({ config: config.alerts, log }) }) {
   const file = path.join(dataDir, 'results.json');
+  const alertFile = path.join(dataDir, 'alerts.json');
   let history = {};
+  let alertState = {}; // per drill: the result we last alerted on, so a restart doesn't re-alert
   try { history = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { /* first start */ }
+  try { alertState = JSON.parse(fs.readFileSync(alertFile, 'utf8')); } catch { /* first start */ }
   let running = false;
   let lastRun = null;
 
@@ -30,10 +34,12 @@ function createAgent({ config, store, dataDir, log = console }) {
         const failed = r.checks.filter((c) => !c.ok).map((c) => `${c.name} (${c.detail})`);
         if (r.ok) log.info(`[drill] ${r.name}: ok, restored ${r.backup.key} in ${r.restoreMs} ms`);
         else log.error(`[drill] ${r.name}: FAILED ${r.error || failed.join('; ')}`);
+        alertState[drill.name] = await alerter.onResult(alertState[drill.name] || null, r);
       }
       lastRun = new Date().toISOString();
       fs.mkdirSync(dataDir, { recursive: true });
       fs.writeFileSync(file, JSON.stringify(history));
+      fs.writeFileSync(alertFile, JSON.stringify(alertState));
     } finally {
       running = false;
     }
@@ -45,7 +51,7 @@ function createAgent({ config, store, dataDir, log = console }) {
       return runs.length ? publicView(runs[runs.length - 1]) : { name: d.name, ok: null, pending: true };
     });
     const ok = drills.every((d) => d.ok === true);
-    return { ok, version, checkedAt: lastRun, every: config.every / 36e5 + ' h', drills };
+    return { ok, version, checkedAt: lastRun, every: config.every / 36e5 + ' h', everyMs: config.every, alerts: alerter.channels.length > 0, drills };
   }
 
   function recent() {
@@ -76,6 +82,8 @@ function createServer(agent, publicDir = path.join(__dirname, 'public')) {
 if (require.main === module) {
   const config = loadConfig(process.env.DRILL_CONFIG || path.join(__dirname, 'drills.yml'));
   const agent = createAgent({ config, store: createStore(config.storage), dataDir: process.env.DATA_DIR || path.join(__dirname, 'data') });
+  const channels = createAlerter({ config: config.alerts }).channels;
+  console.log(`[drill] alerts: ${channels.join(' + ') || 'off (set ALERT_WEBHOOK_URL, or ALERT_EMAIL_TO with SMTP_HOST)'}`);
   const port = Number(process.env.PORT) || 3000;
   createServer(agent).listen(port, () => console.log(`[drill] restore-drill ${version} on :${port}, ${config.drills.length} drills every ${config.every / 36e5} h`));
   // First run shortly after start, then on the interval.
