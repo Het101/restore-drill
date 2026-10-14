@@ -158,6 +158,7 @@ test('agent: health is pending, then reports each drill; the server serves it', 
   const base = `http://127.0.0.1:${web.address().port}`;
   const res = await fetch(`${base}/api/health`);
   assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  assert.equal(res.headers.get('strict-transport-security'), 'max-age=31536000; includeSubDomains'); // DAST finding
   const health = await res.json();
   assert.equal(health.ok, true);
   assert.equal(health.drills[0].checks.length, 4);
