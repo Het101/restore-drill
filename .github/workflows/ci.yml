@@ -266,3 +266,6 @@ jobs:
           start=$(date +%s%N); docker stop -t 30 app; ms=$(( ($(date +%s%N) - start) / 1000000 ))
           code=$(docker inspect -f '{{.State.ExitCode}}' app); echo "stop took ${ms} ms, exit ${code}"
           [ "$ms" -lt 5000 ] && [ "$code" -eq 0 ]
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs app
