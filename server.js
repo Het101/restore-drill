@@ -86,9 +86,22 @@ if (require.main === module) {
   const channels = createAlerter({ config: config.alerts }).channels;
   console.log(`[drill] alerts: ${channels.join(' + ') || 'off (set ALERT_WEBHOOK_URL, or ALERT_EMAIL_TO with SMTP_HOST)'}`);
   const port = Number(process.env.PORT) || 3000;
-  createServer(agent).listen(port, () => console.log(`[drill] restore-drill ${version} on :${port}, ${config.drills.length} drills every ${config.every / 36e5} h`));
+  const server = createServer(agent).listen(port, () => console.log(`[drill] restore-drill ${version} on :${port}, ${config.drills.length} drills every ${config.every / 36e5} h`));
   // First run shortly after start, then on the interval.
-  setTimeout(() => { agent.runAll(); setInterval(agent.runAll, config.every).unref(); }, 15_000).unref();
+  let interval;
+  const firstRun = setTimeout(() => { agent.runAll(); interval = setInterval(agent.runAll, config.every).unref(); }, 15_000).unref();
+  // Graceful stop (deploys): stop accepting, close idle keep-alive sockets, let in-flight requests finish, exit 0.
+  // Bounded at 10 s, below Docker's 30 s, so a stuck request or drill can't hold a deploy.
+  const shutdown = (signal) => {
+    console.log(`[drill] ${signal}: shutting down`);
+    setTimeout(() => process.exit(1), 10_000).unref();
+    clearTimeout(firstRun);
+    clearInterval(interval);
+    server.close(() => process.exit(0));
+    server.closeIdleConnections();
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 }
 
 module.exports = { createAgent, createServer };
